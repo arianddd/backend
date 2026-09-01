@@ -15,53 +15,70 @@ class OrderController extends Controller
     /**
      * POST /api/validate-qr
      */
-    public function validateTableQr(Request $request)
-    {
-        $qrToken = trim($request->input('qr_token', ''));
+   public function validateTableQr(Request $request)
+{
+    $qrToken = trim($request->input('qr_token', ''));
 
-        if (empty($qrToken)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Token QR tidak boleh kosong.'
-            ], 400);
-        }
-
-        $parts = explode('|', $qrToken);
-        $rawTable = $parts[0] ?? ''; 
-        $secretKey = $parts[1] ?? '';
-
-        $tableNumber = str_replace(['MEJA-', 'meja-'], '', $rawTable);
-
-        $table = Table::where('table_number', $tableNumber)
-            ->when(!empty($secretKey), function ($query) use ($secretKey) {
-                return $query->where('secret_key', $secretKey);
-            })
-            ->first();
-
-        if (!$table) {
-            $table = Table::where('table_number', $qrToken)->first();
-        }
-
-        if (!$table) {
-            return response()->json([
-                'success' => false,
-                'message' => 'QR Code tidak valid atau meja tidak ditemukan.'
-            ], 404);
-        }
-
-        $activeOrder = Order::where('table_number', $table->table_number)
-            ->whereIn('status', ['pending', 'processing', 'preparing'])
-            ->latest()
-            ->first();
-
+    if (empty($qrToken)) {
         return response()->json([
-            'success'      => true,
-            'message'      => 'QR Code berhasil divalidasi.',
-            'table_number' => $table->table_number,
-            'order_id'     => $activeOrder ? $activeOrder->id : null,
-        ]);
+            'success' => false,
+            'message' => 'Token QR tidak boleh kosong.'
+        ], 400);
     }
 
+    // 1. Pecah token berdasarkan delimiter '|'
+    $parts = explode('|', $qrToken);
+    $rawTable  = trim($parts[0] ?? ''); 
+    $secretKey = trim($parts[1] ?? '');
+    $timestamp = trim($parts[2] ?? null); // Timestamp opsional jika pakai expired
+
+    // 2. Bersihkan 'MEJA-' jika ada
+    $tableNumber = str_replace(['MEJA-', 'meja-'], '', $rawTable);
+
+    // 3. Wajibkan Secret Key (Mencegah bypass dengan angka meja doang)
+    if (empty($secretKey)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Format QR Code tidak valid atau kunci rahasia tidak ditemukan.'
+        ], 400);
+    }
+
+    // 4. Cari meja yang nomor DAN secret_key nya COCOK PERSIS
+    $table = Table::where('table_number', $tableNumber)
+        ->where('secret_key', $secretKey)
+        ->first();
+
+    if (!$table) {
+        return response()->json([
+            'success' => false,
+            'message' => 'QR Code tidak valid atau meja tidak cocok.'
+        ], 404);
+    }
+
+    // 5. OPTIONAL: Validasi Timestamp (Toleransi selisih jam server & HP max 2 menit / 120 detik)
+    if ($timestamp) {
+        $currentTimestamp = floor(time() / 60) * 60;
+        if (abs($currentTimestamp - (int)$timestamp) > 120) {
+            return response()->json([
+                'success' => false,
+                'message' => 'QR Code sudah kadaluwarsa, silakan scan ulang di layar meja.'
+            ], 400);
+        }
+    }
+
+    // 6. Ambil pesanan aktif jika ada
+    $activeOrder = Order::where('table_number', $table->table_number)
+        ->whereIn('status', ['pending', 'processing', 'preparing'])
+        ->latest()
+        ->first();
+
+    return response()->json([
+        'success'      => true,
+        'message'      => 'QR Code berhasil divalidasi.',
+        'table_number' => $table->table_number,
+        'order_id'     => $activeOrder ? $activeOrder->id : null,
+    ]);
+}
     /**
      * POST /api/orders
      */
