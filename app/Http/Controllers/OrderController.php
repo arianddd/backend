@@ -235,32 +235,44 @@ public function show($id)
     /**
      * GET /api/orders/{id}/status
      */
-    public function getOrderStatus($id)
-    {
-        $order = Order::with('items')->find($id);
+   public function getOrderStatus($id)
+{
+    $order = Order::with('items')->find($id);
 
-        if (!$order) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Pesanan tidak ditemukan.'
-            ], 404);
-        }
+    if (!$order) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Pesanan tidak ditemukan.'
+        ], 404);
+    }
 
-        $ordersAhead = Order::whereIn('status', ['pending', 'processing', 'preparing'])
-            ->where('id', '<', $order->id)
-            ->count();
-
-        $queuePosition = in_array($order->status, ['completed', 'cancelled']) 
-            ? 0 
-            : $ordersAhead + 1;
-
+    // 1. Jika pesanan user sudah tidak lagi 'pending' (misal: dimasak, selesai, atau dibatalkan),
+    // maka posisi antrian menunggu otomatis 0.
+    if ($order->status !== 'pending') {
         return response()->json([
             'success'        => true,
             'order'          => $order,
-            'queue_position' => $queuePosition,
-            'orders_ahead'   => $ordersAhead
+            'queue_position' => 0,
+            'orders_ahead'   => 0
         ]);
     }
+
+    // 2. Hitung HANYA pesanan yang MASIH 'pending' yang masuk sebelum pesanan ini.
+    // Pesanan yang sudah 'processing' / 'preparing' tidak dihitung karena sudah masuk kompor.
+    $ordersAhead = Order::where('status', 'pending')
+        ->where('id', '<', $order->id)
+        ->count();
+
+    // 3. Posisi antrian dihitung dari berapa orang lagi di depan yang statusnya masih 'pending' + 1 (dirinya sendiri)
+    $queuePosition = $ordersAhead + 1;
+
+    return response()->json([
+        'success'        => true,
+        'order'          => $order,
+        'queue_position' => $queuePosition,
+        'orders_ahead'   => $ordersAhead
+    ]);
+}
 
     /**
      * PATCH /api/orders/{id}/payment
