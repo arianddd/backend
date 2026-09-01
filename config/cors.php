@@ -1,12 +1,18 @@
 <?php
 
 return [
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
-    'allowed_methods' => ['*'],
-    'allowed_origins' => ['*'],
-    'allowed_origins_patterns' => [],
-    'allowed_headers' => ['*'],
-    'exposed_headers' => [],
-    'max_age' => 0,
-    'supports_credentials' => false,
+   'paths' => ['api/*', 'sanctum/csrf-cookie'],
+
+'allowed_methods' => ['*'],
+
+'allowed_origins' => [
+    'https://makbos.vercel.app',
+    'http://localhost:5173', // Tetap pertahankan untuk pengujian lokal
+],
+
+'allowed_origins_patterns' => [],
+
+'allowed_headers' => ['*'],
+
+'supports_credentials' => true,
 ];
