@@ -352,8 +352,8 @@ public function getKitchenOrders()
      */
     public function updateOrderStatus(Request $request, $id)
 {
-    $request->validate([
-        'status' => 'required|string|in:pending,cooking,completed,cancelled',
+      $request->validate([
+        'status' => 'required|string|in:pending,cooking,processing,completed,cancelled,paid,done,lunas',
     ]);
 
     $order = Order::find($id);
