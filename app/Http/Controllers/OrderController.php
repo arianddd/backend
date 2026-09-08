@@ -351,32 +351,59 @@ public function getKitchenOrders()
      * PATCH /api/orders/{id}/update-status
      */
     public function updateOrderStatus(Request $request, $id)
-    {
-        $request->validate([
-            'status' => 'required|string',
-        ]);
+{
+    $request->validate([
+        'status' => 'required|string|in:pending,cooking,completed,cancelled',
+    ]);
 
-        $order = Order::find($id);
+    $order = Order::find($id);
 
-        if (!$order) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Pesanan tidak ditemukan.'
-            ], 404);
-        }
-
-        $order->status = $request->status;
-        
-        if ($request->status === 'completed') {
-            $order->payment_status = 'paid';
-        }
-
-        $order->save();
-
+    if (!$order) {
         return response()->json([
-            'success' => true,
-            'message' => 'Status pesanan berhasil diperbarui.',
-            'order'   => $order
-        ]);
+            'success' => false,
+            'message' => 'Pesanan tidak ditemukan.'
+        ], 404);
     }
+
+    // Cukup update status pesanan saja
+    $order->status = $request->status;
+
+    $order->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Status pesanan berhasil diperbarui.',
+        'order'   => $order
+    ]);
+}
+    public function updatePaymentStatus(Request $request, $id)
+{
+    $request->validate([
+        'payment_status' => 'required|string|in:unpaid,paid',
+        'payment_method' => 'nullable|string|in:cash,qris'
+    ]);
+
+    $order = Order::find($id);
+
+    if (!$order) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Pesanan tidak ditemukan.'
+        ], 404);
+    }
+
+    $order->payment_status = $request->payment_status;
+    
+    if ($request->has('payment_method')) {
+        $order->payment_method = $request->payment_method;
+    }
+
+    $order->save();
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Status pembayaran berhasil diperbarui.',
+        'order'   => $order
+    ]);
+}
 }
